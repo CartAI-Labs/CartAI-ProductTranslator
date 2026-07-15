@@ -11,15 +11,15 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-// KafkaConsumer listens to a Kafka topic and delegates processing to the TranslationService.
-type KafkaConsumer struct {
+// TranslationRequestedConsumer listens to a Kafka topic and delegates processing to the TranslationService.
+type TranslationRequestedConsumer struct {
 	reader    *kafka.Reader
 	service   *application.TranslationService
 	publisher domain.EventPublisherPort
 }
 
-// NewKafkaConsumer initializes a new Kafka consumer attached to a specific topic and group.
-func NewKafkaConsumer(brokers []string, topic string, groupID string, service *application.TranslationService, publisher domain.EventPublisherPort) (*KafkaConsumer, error) {
+// NewTranslationRequestedConsumer initializes a new Kafka consumer attached to a specific topic and group.
+func NewTranslationRequestedConsumer(brokers []string, topic string, groupID string, service *application.TranslationService, publisher domain.EventPublisherPort) (*TranslationRequestedConsumer, error) {
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("at least one broker is required")
 	}
@@ -32,7 +32,7 @@ func NewKafkaConsumer(brokers []string, topic string, groupID string, service *a
 		MaxBytes: 10e6, // 10MB
 	})
 
-	return &KafkaConsumer{
+	return &TranslationRequestedConsumer{
 		reader:    reader,
 		service:   service,
 		publisher: publisher,
@@ -40,7 +40,7 @@ func NewKafkaConsumer(brokers []string, topic string, groupID string, service *a
 }
 
 // Start begins a blocking loop that reads messages from Kafka.P
-func (k *KafkaConsumer) Start(ctx context.Context) {
+func (k *TranslationRequestedConsumer) Start(ctx context.Context) {
 	log.Printf("Starting Kafka consumer on topic %s...", k.reader.Config().Topic)
 
 	for {
@@ -74,7 +74,7 @@ func (k *KafkaConsumer) Start(ctx context.Context) {
 			log.Printf("Successfully translated product %s to %d languages", translation.ProductID, len(translation.Translations))
 
 			if k.publisher != nil {
-				if err := k.publisher.PublishTranslationCompleted(ctx, translation); err != nil {
+				if err := k.publisher.PublishTranslation(ctx, translation); err != nil {
 					log.Printf("Failed to publish translation completed event: %v", err)
 				} else {
 					log.Printf("Successfully published translation.completed for product %s", translation.ProductID)
@@ -84,7 +84,7 @@ func (k *KafkaConsumer) Start(ctx context.Context) {
 	}
 }
 
-// Close gracefully closes the Kafka reader connection.
-func (k *KafkaConsumer) Close() error {
+// Close safely terminates the Kafka reader connection.
+func (k *TranslationRequestedConsumer) Close() error {
 	return k.reader.Close()
 }

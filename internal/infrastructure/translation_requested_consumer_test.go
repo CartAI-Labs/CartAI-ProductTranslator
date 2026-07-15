@@ -14,8 +14,7 @@ func TestKafkaConsumer_ProcessMessage(t *testing.T) {
 		t.Skip("Skipping Kafka integration test. Set RUN_KAFKA_INTEGRATION_TESTS=1 to run.")
 	}
 
-	// This is the RED phase: NewKafkaConsumer doesn't exist yet
-	consumer, err := infrastructure.NewKafkaConsumer(
+	consumer, err := infrastructure.NewTranslationRequestedConsumer(
 		[]string{"localhost:9092"}, // Broker URL
 		"translation.requested",    // Topic
 		"translation-group",        // Consumer Group

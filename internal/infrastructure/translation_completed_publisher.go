@@ -54,6 +54,6 @@ func (p *TranslationCompletedPublisher) PublishTranslation(ctx context.Context, 
 }
 
 // Close gracefully closes the Kafka writer connection.
-func (p *KafkaPublisher) Close() error {
+func (p *TranslationCompletedPublisher) Close() error {
 	return p.writer.Close()
 }
