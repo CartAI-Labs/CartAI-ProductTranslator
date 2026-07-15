@@ -27,30 +27,33 @@ func NewGCPTranslator() (*GCPTranslator, error) {
 	}, nil
 }
 
-// TranslateText calls the real Google Cloud Translation API.
-func (g *GCPTranslator) TranslateText(ctx context.Context, text string, sourceLang string, targetLang string) (string, error) {
+// TranslateTexts calls the real Google Cloud Translation API for an array of texts.
+func (g *GCPTranslator) TranslateTexts(ctx context.Context, texts []string, targetLang string) ([]string, error) {
+	if len(texts) == 0 {
+		return []string{}, nil
+	}
+
 	target, err := language.Parse(targetLang)
 	if err != nil {
-		return "", fmt.Errorf("invalid target language: %w", err)
+		return nil, fmt.Errorf("invalid target language: %w", err)
 	}
 
-	source, err := language.Parse(sourceLang)
+	// Passing nil for options enables Google's auto-detect for source language
+	translations, err := g.client.Translate(ctx, texts, target, nil)
 	if err != nil {
-		return "", fmt.Errorf("invalid source language: %w", err)
+		return nil, fmt.Errorf("google translation failed: %w", err)
 	}
 
-	translations, err := g.client.Translate(ctx, []string{text}, target, &translate.Options{
-		Source: source,
-	})
-	if err != nil {
-		return "", fmt.Errorf("google translation failed: %w", err)
+	if len(translations) != len(texts) {
+		return nil, fmt.Errorf("expected %d translations, got %d", len(texts), len(translations))
 	}
 
-	if len(translations) == 0 {
-		return "", fmt.Errorf("no translations returned from google")
+	result := make([]string, len(texts))
+	for i, t := range translations {
+		result[i] = t.Text
 	}
 
-	return translations[0].Text, nil
+	return result, nil
 }
 
 // Close closes the underlying GCP client.

@@ -13,12 +13,13 @@ import (
 
 // KafkaConsumer listens to a Kafka topic and delegates processing to the TranslationService.
 type KafkaConsumer struct {
-	reader  *kafka.Reader
-	service *application.TranslationService
+	reader    *kafka.Reader
+	service   *application.TranslationService
+	publisher domain.EventPublisherPort
 }
 
 // NewKafkaConsumer initializes a new Kafka consumer attached to a specific topic and group.
-func NewKafkaConsumer(brokers []string, topic string, groupID string, service *application.TranslationService) (*KafkaConsumer, error) {
+func NewKafkaConsumer(brokers []string, topic string, groupID string, service *application.TranslationService, publisher domain.EventPublisherPort) (*KafkaConsumer, error) {
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("at least one broker is required")
 	}
@@ -32,12 +33,13 @@ func NewKafkaConsumer(brokers []string, topic string, groupID string, service *a
 	})
 
 	return &KafkaConsumer{
-		reader:  reader,
-		service: service,
+		reader:    reader,
+		service:   service,
+		publisher: publisher,
 	}, nil
 }
 
-// Start begins a blocking loop that reads messages from Kafka.
+// Start begins a blocking loop that reads messages from Kafka.P
 func (k *KafkaConsumer) Start(ctx context.Context) {
 	log.Printf("Starting Kafka consumer on topic %s...", k.reader.Config().Topic)
 
@@ -59,8 +61,7 @@ func (k *KafkaConsumer) Start(ctx context.Context) {
 			log.Printf("Failed to unmarshal event (offset %d): %v", m.Offset, err)
 			continue
 		}
-
-		log.Printf("Received translation request for product %s (%s -> %s)", event.ProductID, event.SourceLanguage, event.TargetLanguage)
+		log.Printf("Received translation request for product %s (target languages: %v)", event.ProductID, event.TargetLanguages)
 
 		// 🛑 INYECCIÓN DE DEPENDENCIAS: Llamamos a la Capa de Aplicación
 		if k.service != nil {
@@ -70,8 +71,15 @@ func (k *KafkaConsumer) Start(ctx context.Context) {
 				// Aquí en el futuro lo enviaremos al Topic de letras muertas (DLQ)
 				continue
 			}
-			log.Printf("Successfully translated product %s! New Name: %s", translation.ProductID, translation.Name)
-			// Aquí en el futuro emitiremos el evento a catalog.ready
+			log.Printf("Successfully translated product %s to %d languages", translation.ProductID, len(translation.Translations))
+
+			if k.publisher != nil {
+				if err := k.publisher.PublishTranslationCompleted(ctx, translation); err != nil {
+					log.Printf("Failed to publish translation completed event: %v", err)
+				} else {
+					log.Printf("Successfully published translation.completed for product %s", translation.ProductID)
+				}
+			}
 		}
 	}
 }

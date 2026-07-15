@@ -19,23 +19,48 @@ func NewTranslationService(translationPort domain.TranslationPort) *TranslationS
 	}
 }
 
-// ProcessTranslation translates the Name and Description of a product event using the configured port.
-func (s *TranslationService) ProcessTranslation(ctx context.Context, event domain.TranslationRequestedEvent) (domain.TranslationRequestedEvent, error) {
-	translatedName, err := s.translationPort.TranslateText(ctx, event.Name, event.SourceLanguage, event.TargetLanguage)
-	if err != nil {
-		return event, fmt.Errorf("failed to translate product name: %w", err)
+// ProcessTranslation translates the Name, Description and Attributes of a product for all requested languages.
+func (s *TranslationService) ProcessTranslation(ctx context.Context, event domain.TranslationRequestedEvent) (domain.TranslationCompletedEvent, error) {
+	productTranslations := domain.TranslationCompletedEvent{
+		ProductID:    event.ProductID,
+		Translations: make(map[string]domain.ProductTranslation),
 	}
 
-	translatedDesc, err := s.translationPort.TranslateText(ctx, event.Description, event.SourceLanguage, event.TargetLanguage)
-	if err != nil {
-		return event, fmt.Errorf("failed to translate product description: %w", err)
+	// For each target language, we make one batch API call
+	for _, targetLang := range event.TargetLanguages {
+		// Prepare the array of texts to translate:
+		// [0] = Name, [1] = Description, [2..N] = Attributes
+		values := []string{event.Name, event.Description}
+
+		// We need to keep track of attribute keys to map them back
+		attrKeys := make([]string, 0, len(event.Attributes))
+		for k, v := range event.Attributes {
+			attrKeys = append(attrKeys, k)
+			values = append(values, v)
+		}
+
+		// Call the translation port
+		translatedValues, err := s.translationPort.Translate(ctx, values, targetLang)
+		if err != nil {
+			return productTranslations, fmt.Errorf("failed to translate to %s: %w", targetLang, err)
+		}
+		if len(translatedValues) != len(values) {
+			return productTranslations, fmt.Errorf("translation mismatch for %s: expected %d, got %d", targetLang, len(values), len(translatedValues))
+		}
+
+		// Map back the results
+		translation := domain.ProductTranslation{
+			Name:        translatedValues[0],
+			Description: translatedValues[1],
+			Attributes:  make(map[string]string),
+		}
+
+		for i, k := range attrKeys {
+			translation.Attributes[k] = translatedValues[2+i]
+		}
+
+		productTranslations.Translations[targetLang] = translation
 	}
 
-	// Create a copy of the event with translated fields
-	translatedEvent := event
-	translatedEvent.Name = translatedName
-	translatedEvent.Description = translatedDesc
-	translatedEvent.SourceLanguage = event.TargetLanguage // Now the source is the target
-
-	return translatedEvent, nil
+	return productTranslations, nil
 }
