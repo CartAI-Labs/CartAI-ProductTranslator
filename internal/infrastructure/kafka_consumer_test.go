@@ -19,6 +19,8 @@ func TestKafkaConsumer_ProcessMessage(t *testing.T) {
 		[]string{"localhost:9092"}, // Broker URL
 		"translation.requested",    // Topic
 		"translation-group",        // Consumer Group
+		nil,                        // Inyección de dependencias del servicio de aplicación
+		nil,                        // Inyección de dependencias del publicador de eventos
 	)
 	if err != nil {
 		t.Fatalf("Failed to initialize Kafka consumer: %v", err)

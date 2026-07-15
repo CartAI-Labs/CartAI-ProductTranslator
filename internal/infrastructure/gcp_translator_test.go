@@ -19,12 +19,19 @@ func TestGCPTranslator_TranslateText(t *testing.T) {
 	}
 	defer translator.Close()
 
-	translatedText, err := translator.TranslateText(context.Background(), "Hola mundo", "es", "en")
+	translatedTexts, err := translator.Translate(context.Background(), []string{"Hola mundo", "Rojo"}, "en_US")
 	if err != nil {
-		t.Fatalf("Failed to translate text: %v", err)
+		t.Fatalf("Failed to translate texts: %v", err)
 	}
 
-	if translatedText != "Hello world" {
-		t.Errorf("Expected 'Hello world', got '%s'", translatedText)
+	if len(translatedTexts) != 2 {
+		t.Fatalf("Expected 2 translations, got %d", len(translatedTexts))
+	}
+
+	if translatedTexts[0] != "Hello World" && translatedTexts[0] != "Hello world" {
+		t.Errorf("Expected 'Hello world', got '%s'", translatedTexts[0])
+	}
+	if translatedTexts[1] != "Red" && translatedTexts[1] != "red" {
+		t.Errorf("Expected 'Red', got '%s'", translatedTexts[1])
 	}
 }
