@@ -14,8 +14,8 @@ func TestParseTranslationRequestedEvent(t *testing.T) {
 		"productId": "PROD-123",
 		"name": "Ordenador Portátil",
 		"description": "Un ordenador muy potente",
-		"sourceLanguage": "es",
-		"targetLanguage": "en"
+		"attributes": {"color": "Rojo"},
+		"targetLanguages": ["en_US", "fr_FR"]
 	}`
 
 	// Act
@@ -32,6 +32,18 @@ func TestParseTranslationRequestedEvent(t *testing.T) {
 	}
 	if event.Name != "Ordenador Portátil" {
 		t.Errorf("Expected Name 'Ordenador Portátil', got '%s'", event.Name)
+	}
+	if event.Description != "Un ordenador muy potente" {
+		t.Errorf("Expected Description 'Un ordenador muy potente', got '%s'", event.Description)
+	}
+	if event.Attributes["color"] != "Rojo" {
+		t.Errorf("Expected Attributes[\"color\"] 'Rojo', got '%s'", event.Attributes["color"])
+	}
+	if len(event.TargetLanguages) != 2 {
+		t.Fatalf("Expected 2 target languages, got %d", len(event.TargetLanguages))
+	}
+	if event.TargetLanguages[0] != "en_US" || event.TargetLanguages[1] != "fr_FR" {
+		t.Errorf("Expected TargetLanguages [en_US fr_FR], got %v", event.TargetLanguages)
 	}
 }
 
