@@ -41,6 +41,4 @@ CartAI-ProductTranslator/
 * **English Only:** All code (variables, docstrings, comments), application logs, and markdown documentation MUST be written exclusively in English.
 
 ## 6. Git Flow & Agent Behavior
-* **STRICT RULE (Git):** Do not execute `git commit` or push changes without the user's direct and explicit instruction.
-* **STRICT RULE (Linear):** Every git commit message MUST be prefixed with the relevant Linear ticket ID (e.g., `[CAR-26] feat: ...`).
-* **STRICT RULE (Review Pace):** NEVER rush the user to review code or move to the next task. Provide explanations and wait patiently for their manual verification.
+Governed by the global `~/.claude/CLAUDE.md` (commit/push only on explicit instruction, `[CAR-XX]` Linear prefix, no rushing review).
