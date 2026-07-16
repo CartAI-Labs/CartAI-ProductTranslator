@@ -5,11 +5,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/CartAI-Labs/CartAI-ProductTranslator/internal/application"
 	"github.com/CartAI-Labs/CartAI-ProductTranslator/internal/domain"
 	"github.com/segmentio/kafka-go"
 )
+
+const (
+	baseBackoff = 500 * time.Millisecond
+	maxBackoff  = 30 * time.Second
+)
+
+// nextBackoff returns the wait time before retrying a failed ReadMessage,
+// doubling with each consecutive attempt and capping at maxBackoff.
+func nextBackoff(attempt int) time.Duration {
+	backoff := baseBackoff * time.Duration(1<<uint(attempt-1))
+	if backoff > maxBackoff {
+		return maxBackoff
+	}
+	return backoff
+}
 
 // TranslationRequestedConsumer listens to a Kafka topic and delegates processing to the TranslationService.
 type TranslationRequestedConsumer struct {
@@ -39,9 +55,11 @@ func NewTranslationRequestedConsumer(brokers []string, topic string, groupID str
 	}, nil
 }
 
-// Start begins a blocking loop that reads messages from Kafka.P
+// Start begins a blocking loop that reads messages from Kafka.
 func (k *TranslationRequestedConsumer) Start(ctx context.Context) {
 	log.Printf("Starting Kafka consumer on topic %s...", k.reader.Config().Topic)
+
+	readErrors := 0
 
 	for {
 		m, err := k.reader.ReadMessage(ctx)
@@ -51,9 +69,19 @@ func (k *TranslationRequestedConsumer) Start(ctx context.Context) {
 				log.Println("Context cancelled, shutting down Kafka consumer")
 				break
 			}
-			log.Printf("Error while reading message: %v", err)
+			readErrors++
+			wait := nextBackoff(readErrors)
+			log.Printf("Error while reading message (attempt %d, retrying in %s): %v", readErrors, wait, err)
+
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+				log.Println("Context cancelled, shutting down Kafka consumer")
+				return
+			}
 			continue
 		}
+		readErrors = 0
 
 		// Decode the JSON message into our Domain Event
 		var event domain.TranslationRequestedEvent
